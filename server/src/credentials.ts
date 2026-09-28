@@ -241,21 +241,27 @@ export async function decryptCredentialForUse(
 export async function resolveModelApiKey(input: {
   encryptionKey: string;
   reader: ModelCredentialSecretReader;
-  provider: "openai" | "anthropic";
+  provider: "openai" | "anthropic" | "google";
   keyId: string;
   environment: Record<string, string | undefined>;
 }) {
-  const stored = await input.reader.readModelSecret({
-    provider: input.provider,
-    keyId: input.keyId,
-  });
-  if (stored) {
-    return decryptSecret(input.encryptionKey, stored.encryptedValue);
+  if (input.provider === "openai" || input.provider === "anthropic") {
+    const stored = await input.reader.readModelSecret({
+      provider: input.provider,
+      keyId: input.keyId,
+    });
+    if (stored) {
+      return decryptSecret(input.encryptionKey, stored.encryptedValue);
+    }
   }
 
   const environmentKey =
     input.environment[
-      input.provider === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY"
+      input.provider === "anthropic"
+        ? "ANTHROPIC_API_KEY"
+        : input.provider === "google"
+          ? (input.environment.GOOGLE_API_KEY ? "GOOGLE_API_KEY" : "GOOGLE_GENERATIVE_AI_API_KEY")
+          : "OPENAI_API_KEY"
     ]?.trim();
   return environmentKey || null;
 }

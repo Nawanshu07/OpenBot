@@ -250,11 +250,13 @@ SERVICES+=(agent-langgraph)
 
 export SUPERVISOR_TOKEN COMPUTER_TOKEN WORKER_SHARED_SECRET
 export COMPUTER_PORT BOT_PORT LANGGRAPH_PORT SUPERVISOR_PORT
-docker compose up -d --build "${SERVICES[@]}" >/dev/null
-if ! docker compose run --rm --build migrate >"$LOGS/migrate.log" 2>&1; then
-  red "  Migrations did not apply. The database is not the schema this server expects."
-  red "  Log: $LOGS/migrate.log"
-  exit 1
+docker compose up -d --build "${SERVICES[@]}"
+if ! bun run --filter server db:migrate >"$LOGS/migrate.log" 2>&1; then
+  if ! docker compose run --rm --build migrate >"$LOGS/migrate.log" 2>&1; then
+    red "  Migrations did not apply. The database is not the schema this server expects."
+    red "  Log: $LOGS/migrate.log"
+    exit 1
+  fi
 fi
 wait_for "http://localhost:$COMPUTER_PORT/health" "agent-computer"
 if [ "$BOT_PROVIDER" != "anthropic" ]; then
@@ -380,11 +382,29 @@ else
 fi
 
 info "3/4  Runtime health"
-INFO="$(curl -fsS --max-time 8 "http://localhost:$SERVER_PORT/api/copilotkit/info")"
-python3 - "$INFO" <<'PY'
-import json, sys
-info = json.loads(sys.argv[1])
-status, agents = info.get("licenseStatus"), list(info.get("agents", {}))
+PYTHON_BIN="$(command -v python3 || command -v python || true)"
+"$PYTHON_BIN" - "$SERVER_PORT" <<'PY'
+import json, sys, time, urllib.request
+
+port = sys.argv[1]
+url = f"http://localhost:{port}/api/copilotkit/info"
+status = None
+agents = []
+info = {}
+
+for _ in range(12):
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            info = json.loads(resp.read().decode())
+            status = info.get("licenseStatus")
+            agents = list(info.get("agents", {}))
+            if status == "valid":
+                break
+    except Exception:
+        pass
+    time.sleep(1)
+
 if status != "valid":
     print(f"\033[31m  licence is '{status}', not 'valid'.\033[0m")
     print("\033[31m  Check INTELLIGENCE_API_KEY: npx copilotkit@latest login && npx copilotkit@latest project select\033[0m")

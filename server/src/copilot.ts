@@ -158,7 +158,7 @@ export function standingRoleMessage(
 }
 
 export type RuntimeModel = {
-  provider: "openai" | "anthropic";
+  provider: "openai" | "anthropic" | "google";
   defaultModel: string;
   plan?: PlanModelConfig;
 };
@@ -192,17 +192,22 @@ export function runtimeModelForEnvironment(
   const provider =
     selectedProvider === "anthropic"
       ? "anthropic"
-      : selectedProvider === "openai" || selectedProvider === ""
-        ? "openai"
-        : packageModel.provider;
+      : selectedProvider === "google" || selectedProvider === "gemini"
+        ? "google"
+        : selectedProvider === "openai" || selectedProvider === ""
+          ? "openai"
+          : packageModel.provider;
   const defaultModel =
     provider === packageModel.provider
       ? packageModel.defaultModel
       : provider === "anthropic"
         ? "claude-sonnet-4-5"
-        : "gpt-5.6-terra";
+        : provider === "google"
+          ? "gemini-3.5-flash-lite"
+          : "gpt-5.6-terra";
   const selectedModelApplies =
     provider === "anthropic" ||
+    provider === "google" ||
     ((!selectedProvider || selectedProvider === "openai") &&
       !!environment.OPENAI_BASE_URL?.trim());
   return {
@@ -360,7 +365,7 @@ export function builtInAgentConfiguration(
       // biome-ignore lint/correctness/useYield: this agent must fail when iteration starts.
       factory: async function* () {
         throw new Error(
-          `Model credential is not configured for ${agent.name}. Add the package credential or set ${model.provider === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY"}.`,
+          `Model credential is not configured for ${agent.name}. Add the package credential or set ${model.provider === "anthropic" ? "ANTHROPIC_API_KEY" : model.provider === "google" ? "GOOGLE_API_KEY" : "OPENAI_API_KEY"}.`,
         );
       },
     };

@@ -48,7 +48,9 @@ export function createModelCompleter(deps: {
            */
           ...(anthropic
             ? { max_tokens: 1024 }
-            : { response_format: { type: "json_object" } }),
+            : process.env.OPENAI_BASE_URL
+              ? {}
+              : { response_format: { type: "json_object" } }),
           messages: [{ role: "user", content: prompt }],
         }),
         signal: signal

@@ -143,7 +143,7 @@ if (REASONING_EFFORT && !USE_RESPONSES_API) {
 
 function defaultModelFor(provider: string): string {
   if (provider === "anthropic") return "claude-sonnet-4-5";
-  if (provider === "google") return "gemini-2.5-flash";
+  if (provider === "google") return "gemini-3.5-flash-lite";
   return "gpt-5.5";
 }
 
